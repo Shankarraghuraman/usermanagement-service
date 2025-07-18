@@ -1,19 +1,79 @@
 pipeline {
-  agent any
+    agent any
 
-  stages {
-    stage('Checkout') {
-      steps {
-        git branch: 'feature/shankar',
-            credentialsId: 'da56260c-c9a4-4c3f-9962-73583d6c5f7b',
-            url: 'https://github.com/shankarraghuraman/usermanagement-service.git'
-      }
+    environment {
+        AWS_REGION = 'us-east-1'
+        ECR_REGISTRY = '434748569008.dkr.ecr.us-east-1.amazonaws.com'
+        ECR_REPOSITORY = 'shankar/usermgmt'
+        GIT_BRANCH = 'feature/shankar'
+        GIT_REPO = 'https://github.com/shankarraghuraman/usermanagement-service.git'
+        GITHUB_CREDENTIALS = 'github-creds'
+        AWS_CREDENTIALS_ID = 'bce35d9c-d0a5-4ec0-9e3d-45073158f3d0'
+        ECS_CLUSTER = 'sha_CI_CD-Demo'
+        ECS_SERVICE = 'usermgmt-service' // ✅ update this with actual service name
     }
 
-    stage('Build JAR with Maven') {
-      steps {
-        sh 'mvn clean package'
-      }
+    stages {
+        stage('Checkout Code') {
+            steps {
+                git branch: "${GIT_BRANCH}",
+                    url: "${GIT_REPO}",
+                    credentialsId: "${GITHUB_CREDENTIALS}"
+            }
+        }
+
+        stage('Build Maven Package') {
+            steps {
+                sh 'mvn clean package'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    COMMIT_SHA = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+                    IMAGE_TAG = "${COMMIT_SHA}"
+                    env.IMAGE_URI = "${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}"
+
+                    sh """
+                        docker build -t ${IMAGE_URI} .
+                    """
+                }
+            }
+        }
+
+        stage('Login & Push to AWS ECR') {
+            steps {
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: "${AWS_CREDENTIALS_ID}"]]) {
+                    sh """
+                        aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}
+                        docker push ${IMAGE_URI}
+                    """
+                }
+            }
+        }
+
+        stage('Deploy to ECS Fargate') {
+            steps {
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: "${AWS_CREDENTIALS_ID}"]]) {
+                    sh """
+                        aws ecs update-service \
+                            --cluster ${ECS_CLUSTER} \
+                            --service ${ECS_SERVICE} \
+                            --force-new-deployment \
+                            --region ${AWS_REGION}
+                    """
+                }
+            }
+        }
     }
-  }
+
+    post {
+        success {
+            echo "✅ Build and deployment successful!"
+        }
+        failure {
+            echo "❌ Build or deployment failed!"
+        }
+    }
 }
