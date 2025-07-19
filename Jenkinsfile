@@ -31,9 +31,8 @@ pipeline {
             steps {
                 script {
                     def COMMIT_SHA = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                    def IMAGE_TAG = "${COMMIT_SHA}"
-                    env.IMAGE_TAG = IMAGE_TAG
-                    sh "docker build -t ${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG} ."
+                    env.IMAGE_TAG = COMMIT_SHA
+                    sh "docker build -t ${ECR_REGISTRY}/${ECR_REPOSITORY}:${env.IMAGE_TAG} ."
                 }
             }
         }
@@ -50,27 +49,21 @@ pipeline {
             }
         }
 
-        stage('Terraform Init') {
+        stage('Terraform Init & Apply') {
             steps {
-                dir('terraform') {
-                    sh 'terraform init'
-                }
-            }
-        }
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
+                    dir('terraform') {
+                        sh '''
+                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                            export AWS_REGION=$AWS_REGION
 
-        stage('Terraform Import (if needed)') {
-            steps {
-                dir('terraform') {
-                    sh 'terraform import aws_ecs_task_definition.usermgmt_task usermgmt-task || true'
-                }
-            }
-        }
-
-        stage('Terraform Plan & Apply') {
-            steps {
-                dir('terraform') {
-                    sh 'terraform plan -out=tfplan'
-                    sh 'terraform apply -auto-approve tfplan'
+                            terraform init
+                            terraform import aws_ecs_task_definition.usermgmt_task usermgmt-task || true
+                            terraform plan -out=tfplan
+                            terraform apply -auto-approve tfplan
+                        '''
+                    }
                 }
             }
         }
