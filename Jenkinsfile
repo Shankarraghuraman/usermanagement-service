@@ -1,112 +1,92 @@
 pipeline {
-    agent any
-
-    environment {
-        AWS_REGION = 'us-east-1'
-        ECR_REGISTRY = '434748569008.dkr.ecr.us-east-1.amazonaws.com'
-        ECR_REPOSITORY = 'shankar/usermgmt'
-        GIT_BRANCH = 'feature/shankar'
-        GIT_REPO = 'https://github.com/shankarraghuraman/usermanagement-service.git'
-        GITHUB_CREDENTIALS = 'github-creds'
-        AWS_CREDENTIALS_ID = 'Aws-creds'
-        ECS_CLUSTER = 'sha_CI_CD-Demo'
-        ECS_SERVICE = 'usermgmt-service'
+  agent any
+  environment {
+    AWS_ACCOUNT_ID = '434748569008'
+    AWS_REGION     = 'us-east-1'
+    ECR_REPO       = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/shankar/usermgmt"
+    COMMIT_SHA     = ''
+    IMAGE_TAG      = ''
+  }
+  stages {
+    stage('Checkout & Build') {
+      steps {
+        checkout scm
+        sh 'mvn clean package -DskipTests'
+      }
     }
 
-    stages {
-        stage('Checkout Code') {
-            steps {
-                git branch: "${GIT_BRANCH}",
-                    url: "${GIT_REPO}",
-                    credentialsId: "${GITHUB_CREDENTIALS}"
-            }
+    stage('Build Docker Image') {
+      steps {
+        script {
+          COMMIT_SHA = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+          IMAGE_TAG = "${COMMIT_SHA}"
         }
-
-        stage('Build Maven Package') {
-            steps {
-                sh 'mvn clean package'
-            }
-        }
-
-        stage('Build Docker Image') {
-            steps {
-                script {
-                    COMMIT_SHA = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                    IMAGE_TAG = "${COMMIT_SHA}"
-                    env.IMAGE_URI = "${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}"
-
-                    sh """
-                        docker build -t ${IMAGE_URI} .
-                    """
-                }
-            }
-        }
-
-        stage('Login & Push to AWS ECR') {
-            steps {
-                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: "${AWS_CREDENTIALS_ID}"]]) {
-                    sh """
-                        aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}
-                        docker push ${IMAGE_URI}
-                    """
-                }
-            }
-        }
-
-stage('Terraform Apply - ECS Infrastructure') {
-    steps {
-        withCredentials([[
-            $class: 'AmazonWebServicesCredentialsBinding',
-            credentialsId: "${AWS_CREDENTIALS_ID}"
-        ]]) {
-            dir('terraform') {
-                withEnv([
-                    'TF_IMAGE=hashicorp/terraform:1.8.5',
-                    "TF_IMAGE_URI=${IMAGE_URI}",
-                    "TF_SG_ID=sg-06763288ca7ac2b1f"
-                ]) {
-                    sh '''
-                        docker run --rm \
-                          -v "$PWD":/workspace -w /workspace \
-                          -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_DEFAULT_REGION \
-                          "$TF_IMAGE" init
-
-                        docker run --rm \
-                          -v "$PWD":/workspace -w /workspace \
-                          -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_DEFAULT_REGION \
-                          "$TF_IMAGE" apply -auto-approve \
-                          -var="image_uri=$TF_IMAGE_URI" \
-                          -var='subnet_ids=["subnet-0346e6a7e56b71359","subnet-0f98666a4bbb16c0f"]' \
-                          -var="security_group_id=$TF_SG_ID"
-                    '''
-                }
-            }
-        }
-    }
-}
-
-        
-        stage('Deploy to ECS Fargate') {
-            steps {
-                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: "${AWS_CREDENTIALS_ID}"]]) {
-                    sh """
-                        aws ecs update-service \
-                            --cluster ${ECS_CLUSTER} \
-                            --service ${ECS_SERVICE} \
-                            --force-new-deployment \
-                            --region ${AWS_REGION}
-                    """
-                }
-            }
-        }
+        sh "docker build -t ${ECR_REPO}:${IMAGE_TAG} ."
+      }
     }
 
-    post {
-        success {
-            echo "✅ Build and deployment successful!"
-        }
-        failure {
-            echo "❌ Build or deployment failed!"
-        }
+    stage('Push to ECR') {
+      environment {
+        AWS_ACCESS_KEY_ID = credentials('aws-access-key-id')
+        AWS_SECRET_ACCESS_KEY = credentials('aws-secret-access-key')
+      }
+      steps {
+        sh "echo \"$(aws ecr get-login-password --region ${AWS_REGION})\" | docker login --username AWS --password-stdin ${ECR_REPO}"
+        sh "docker push ${ECR_REPO}:${IMAGE_TAG}"
+      }
     }
+
+    stage('Terraform Init') {
+      steps {
+        dir('terraform') {
+          sh "docker run --rm -v $(pwd):/workspace -w /workspace -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_DEFAULT_REGION hashicorp/terraform:1.8.5 init"
+        }
+      }
+    }
+
+    stage('Terraform Import (if needed)') {
+      steps {
+        dir('terraform') {
+          script {
+            sh '''
+              set +e
+              docker run --rm -v $(pwd):/workspace -w /workspace \
+                -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_DEFAULT_REGION \
+                hashicorp/terraform:1.8.5 import aws_ecs_cluster.this sha_CI_CD-Demo
+              docker run --rm -v $(pwd):/workspace -w /workspace \
+                -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_DEFAULT_REGION \
+                hashicorp/terraform:1.8.5 import aws_iam_role.ecs_task_execution_role ecsTaskExecutionRole
+              set -e
+            '''
+          }
+        }
+      }
+    }
+
+    stage('Terraform Plan & Apply') {
+      steps {
+        dir('terraform') {
+          sh """
+            docker run --rm -v $(pwd):/workspace -w /workspace \
+              -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_DEFAULT_REGION \
+              hashicorp/terraform:1.8.5 plan -var=image_uri=${ECR_REPO}:${IMAGE_TAG} \
+                -var='subnet_ids=["subnet-0346e6a7e56b71359","subnet-0f98666a4bbb16c0f"]' \
+                -var=security_group_id=sg-06763288ca7ac2b1f
+          """
+          sh """
+            docker run --rm -v $(pwd):/workspace -w /workspace \
+              -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_DEFAULT_REGION \
+              hashicorp/terraform:1.8.5 apply -auto-approve -var=image_uri=${ECR_REPO}:${IMAGE_TAG} \
+                -var='subnet_ids=["subnet-0346e6a7e56b71359","subnet-0f98666a4bbb16c0f"]' \
+                -var=security_group_id=sg-06763288ca7ac2b1f
+          """
+        }
+      }
+    }
+  }
+
+  post {
+    success { echo '✅ Deployment succeeded.' }
+    failure { echo '❌ Build or deployment failed.' }
+  }
 }
