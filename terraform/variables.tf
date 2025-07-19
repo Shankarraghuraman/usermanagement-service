@@ -1,6 +1,6 @@
-variable "image_uri" {
+variable "image_tag" {
   type        = string
-  description = "ECR image URI with tag"
+  description = "Tag of the Docker image to deploy from ECR"
 }
 
 variable "subnet_ids" {
@@ -8,7 +8,7 @@ variable "subnet_ids" {
   description = "List of subnet IDs for ECS tasks"
 }
 
-variable "security_group_id" {
-  type        = string
-  description = "Security group ID for ECS tasks"
+variable "security_group_ids" {
+  type        = list(string)
+  description = "List of security group IDs for ECS tasks"
 }
