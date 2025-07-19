@@ -1,20 +1,22 @@
+# variables.tf
+
 variable "aws_region" {
   description = "AWS region"
   type        = string
 }
 
 variable "vpc_id" {
-  description = "VPC ID where ECS will run"
+  description = "Existing VPC ID"
   type        = string
 }
 
 variable "public_subnets" {
-  description = "Public subnets for ALB"
+  description = "List of existing public subnet IDs"
   type        = list(string)
 }
 
 variable "private_subnets" {
-  description = "Private subnets for ECS Fargate"
+  description = "List of existing private subnet IDs"
   type        = list(string)
 }
 
@@ -24,11 +26,16 @@ variable "ecr_registry" {
 }
 
 variable "ecr_repository" {
-  description = "ECR repo name"
+  description = "ECR repository name"
   type        = string
 }
 
 variable "image_tag" {
-  description = "Git commit SHA for image tag"
+  description = "Docker image tag"
+  type        = string
+}
+
+variable "ecs_task_execution_role_name" {
+  description = "Existing IAM role name for ECS task execution"
   type        = string
 }
