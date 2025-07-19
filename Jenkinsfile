@@ -54,25 +54,31 @@ pipeline {
         }
 
         stage('Terraform Apply - ECS Infrastructure') {
-            steps {
-                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: "${AWS_CREDENTIALS_ID}"]]) {
-                    dir('terraform') {
-                        sh """
-                            terraform init
-                            terraform plan \
-                                -var='image_uri=${IMAGE_URI}' \
-                                -var='subnet_ids=["subnet-0346e6a7e56b71359","subnet-0f98666a4bbb16c0f"]' \
-                                -var='security_group_id=sg-06763288ca7ac2b1f'
+    steps {
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: "${AWS_CREDENTIALS_ID}"]]) {
+            dir('terraform') {
+                sh """
+                    docker run --rm -v \$PWD:/workspace -w /workspace \
+                    -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
+                    -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+                    -e AWS_DEFAULT_REGION=${AWS_REGION} \
+                    hashicorp/terraform:1.8.5 \
+                    terraform init
 
-                            terraform apply -auto-approve \
-                                -var='image_uri=${IMAGE_URI}' \
-                                -var='subnet_ids=["subnet-0346e6a7e56b71359","subnet-0f98666a4bbb16c0f"]' \
-                                -var='security_group_id=sg-06763288ca7ac2b1f'
-                        """
-                    }
-                }
+                    docker run --rm -v \$PWD:/workspace -w /workspace \
+                    -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
+                    -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+                    -e AWS_DEFAULT_REGION=${AWS_REGION} \
+                    hashicorp/terraform:1.8.5 \
+                    terraform apply -auto-approve \
+                        -var='image_uri=${IMAGE_URI}' \
+                        -var='subnet_ids=["subnet-0346e6a7e56b71359","subnet-0f98666a4bbb16c0f"]' \
+                        -var='security_group_id=sg-06763288ca7ac2b1f'
+                """
             }
         }
+    }
+}
 
         stage('Deploy to ECS Fargate') {
             steps {
