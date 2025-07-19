@@ -2,11 +2,11 @@ pipeline {
     agent any
 
     environment {
-        AWS_REGION = 'us-east-1'
-        ECR_REGISTRY = '434748569008.dkr.ecr.us-east-1.amazonaws.com'
+        AWS_REGION     = 'us-east-1'
+        ECR_REGISTRY   = '434748569008.dkr.ecr.us-east-1.amazonaws.com'
         ECR_REPOSITORY = 'shankar/usermgmt'
-        GIT_BRANCH = 'feature/shankar'
-        GIT_REPO = 'https://github.com/shankarraghuraman/usermanagement-service.git'
+        GIT_BRANCH     = 'feature/shankar'
+        GIT_REPO       = 'https://github.com/shankarraghuraman/usermanagement-service.git'
     }
 
     stages {
@@ -18,6 +18,12 @@ pipeline {
                     IMAGE_TAG = "${COMMIT_SHA}"
                     env.IMAGE_TAG = IMAGE_TAG
                 }
+            }
+        }
+
+        stage('Build Maven Package') {
+            steps {
+                sh 'mvn clean package'
             }
         }
 
@@ -70,7 +76,7 @@ pipeline {
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
                     dir('terraform') {
-                        sh 'terraform plan -out=tfplan'
+                        sh "terraform plan -var=\"image_tag=${IMAGE_TAG}\" -out=tfplan"
                         sh 'terraform apply -auto-approve tfplan'
                     }
                 }
