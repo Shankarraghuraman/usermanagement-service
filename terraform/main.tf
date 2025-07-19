@@ -2,29 +2,13 @@ provider "aws" {
   region = "us-east-1"
 }
 
-resource "aws_ecs_cluster" "this" {
-  name = "sha_CI_CD-Demo"
-}
-
-resource "aws_iam_role" "ecs_task_execution_role" {
-  name = "ecsTaskExecutionRole"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [
-      {
-        Action = "sts:AssumeRole",
-        Effect = "Allow",
-        Principal = {
-          Service = "ecs-tasks.amazonaws.com"
-        }
-      }
-    ]
-  })
-}
-
+# Use existing IAM role instead of creating a new one
 data "aws_iam_role" "ecs_task_execution_role" {
   name = "ecsTaskExecutionRole"
+}
+
+resource "aws_ecs_cluster" "this" {
+  name = "sha_CI_CD-Demo"
 }
 
 resource "aws_ecs_task_definition" "usermgmt_task" {
@@ -38,8 +22,8 @@ resource "aws_ecs_task_definition" "usermgmt_task" {
 
   container_definitions = jsonencode([
     {
-      name      = "usermgmt"
-      image     = var.image_uri
+      name      = "usermgmt-container"
+      image     = "434748569008.dkr.ecr.us-east-1.amazonaws.com/shankar/usermgmt:${var.image_tag}"
       essential = true
       portMappings = [
         {
@@ -55,14 +39,12 @@ resource "aws_ecs_service" "usermgmt_service" {
   name            = "usermgmt-service"
   cluster         = aws_ecs_cluster.this.id
   task_definition = aws_ecs_task_definition.usermgmt_task.arn
-  launch_type     = "FARGATE"
   desired_count   = 1
+  launch_type     = "FARGATE"
 
   network_configuration {
     subnets         = var.subnet_ids
-    security_groups = [var.security_group_id]
+    security_groups = var.security_group_ids
     assign_public_ip = true
   }
-
-  depends_on = [aws_ecs_task_definition.usermgmt_task]
 }
