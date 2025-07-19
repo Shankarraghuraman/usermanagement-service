@@ -10,7 +10,7 @@ pipeline {
         GITHUB_CREDENTIALS = 'github-creds'
         AWS_CREDENTIALS_ID = 'bce35d9c-d0a5-4ec0-9e3d-45073158f3d0'
         ECS_CLUSTER = 'sha_CI_CD-Demo'
-        ECS_SERVICE = 'usermgmt-service' // ✅ update this with actual service name
+        ECS_SERVICE = 'usermgmt-service'
     }
 
     stages {
@@ -49,6 +49,27 @@ pipeline {
                         aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}
                         docker push ${IMAGE_URI}
                     """
+                }
+            }
+        }
+
+        stage('Terraform Apply - ECS Infrastructure') {
+            steps {
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: "${AWS_CREDENTIALS_ID}"]]) {
+                    dir('terraform') {
+                        sh """
+                            terraform init
+                            terraform plan \
+                                -var='image_uri=${IMAGE_URI}' \
+                                -var='subnet_ids=["subnet-0346e6a7e56b71359","subnet-0f98666a4bbb16c0f"]' \
+                                -var='security_group_id=sg-06763288ca7ac2b1f'
+
+                            terraform apply -auto-approve \
+                                -var='image_uri=${IMAGE_URI}' \
+                                -var='subnet_ids=["subnet-0346e6a7e56b71359","subnet-0f98666a4bbb16c0f"]' \
+                                -var='security_group_id=sg-06763288ca7ac2b1f'
+                        """
+                    }
                 }
             }
         }
