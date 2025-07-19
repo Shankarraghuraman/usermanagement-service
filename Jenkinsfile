@@ -32,7 +32,7 @@ pipeline {
                 script {
                     def COMMIT_SHA = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
                     def IMAGE_TAG = "${COMMIT_SHA}"
-                    env.IMAGE_TAG = IMAGE_TAG  // make it available to later stages
+                    env.IMAGE_TAG = IMAGE_TAG
                     sh "docker build -t ${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG} ."
                 }
             }
@@ -52,7 +52,7 @@ pipeline {
 
         stage('Terraform Init') {
             steps {
-                dir('infra') {
+                dir('terraform') {
                     sh 'terraform init'
                 }
             }
@@ -60,7 +60,7 @@ pipeline {
 
         stage('Terraform Import (if needed)') {
             steps {
-                dir('infra') {
+                dir('terraform') {
                     sh 'terraform import aws_ecs_task_definition.usermgmt_task usermgmt-task || true'
                 }
             }
@@ -68,7 +68,7 @@ pipeline {
 
         stage('Terraform Plan & Apply') {
             steps {
-                dir('infra') {
+                dir('terraform') {
                     sh 'terraform plan -out=tfplan'
                     sh 'terraform apply -auto-approve tfplan'
                 }
