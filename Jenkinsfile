@@ -8,7 +8,7 @@ pipeline {
         GIT_BRANCH = 'feature/shankar'
         GIT_REPO = 'https://github.com/shankarraghuraman/usermanagement-service.git'
         GITHUB_CREDENTIALS = 'github-creds'
-        AWS_CREDENTIALS_ID = 'bce35d9c-d0a5-4ec0-9e3d-45073158f3d0'
+        AWS_CREDENTIALS_ID = 'Aws-creds'
         ECS_CLUSTER = 'sha_CI_CD-Demo'
         ECS_SERVICE = 'usermgmt-service'
     }
