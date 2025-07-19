@@ -9,12 +9,20 @@ pipeline {
         GIT_REPO = 'https://github.com/shankarraghuraman/usermanagement-service.git'
     }
 
-    stages {
-        stage('Clone Repo') {
-            steps {
-                git branch: "${env.GIT_BRANCH}", url: "${env.GIT_REPO}", credentialsId: 'github-creds'
-            }
-        }
+      stages {
+    stage('Checkout') {
+      steps {
+        checkout([
+          $class: 'GitSCM',
+          branches: [[name: 'origin/feature/shankar']],
+          userRemoteConfigs: [[
+            url: 'https://github.com/shankarraghuraman/usermanagement-service.git',
+            credentialsId: 'github-creds'
+          ]]
+        ])
+      }
+    }
+   }
 
         stage('Build with Maven') {
             steps {
