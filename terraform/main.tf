@@ -1,14 +1,11 @@
+### main.tf
+
 provider "aws" {
   region = var.aws_region
 }
 
 data "aws_vpc" "selected" {
   id = var.vpc_id
-}
-
-data "aws_subnet" "private" {
-  count = length(var.private_subnets)
-  id    = var.private_subnets[count.index]
 }
 
 data "aws_subnet" "public" {
@@ -22,12 +19,6 @@ resource "aws_ecs_cluster" "this" {
 
 data "aws_iam_role" "ecs_task_execution" {
   name = var.ecs_task_execution_role_name
-}
-
-# Attach AmazonECSTaskExecutionRolePolicy to the ECS task execution role
-resource "aws_iam_role_policy_attachment" "ecs_execution_policy" {
-  role       = var.ecs_task_execution_role_name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
 resource "aws_ecs_task_definition" "this" {
@@ -46,7 +37,8 @@ resource "aws_ecs_task_definition" "this" {
       portMappings = [
         {
           containerPort = 8080,
-          hostPort      = 8080
+          hostPort      = 8080,
+          protocol      = "tcp"
         }
       ]
     }
@@ -61,8 +53,8 @@ resource "aws_ecs_service" "this" {
   desired_count   = 1
 
   network_configuration {
-    subnets          = var.private_subnets
-    assign_public_ip = false
+    subnets          = var.public_subnets
+    assign_public_ip = true
     security_groups  = [aws_security_group.ecs_tasks.id]
   }
 }
