@@ -24,6 +24,12 @@ data "aws_iam_role" "ecs_task_execution" {
   name = var.ecs_task_execution_role_name
 }
 
+# Attach AmazonECSTaskExecutionRolePolicy to the ECS task execution role
+resource "aws_iam_role_policy_attachment" "ecs_execution_policy" {
+  role       = var.ecs_task_execution_role_name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+}
+
 resource "aws_ecs_task_definition" "this" {
   family                   = "usermgmt-task"
   requires_compatibilities = ["FARGATE"]
@@ -55,9 +61,9 @@ resource "aws_ecs_service" "this" {
   desired_count   = 1
 
   network_configuration {
-    subnets         = var.private_subnets
+    subnets          = var.private_subnets
     assign_public_ip = false
-    security_groups = [aws_security_group.ecs_tasks.id]
+    security_groups  = [aws_security_group.ecs_tasks.id]
   }
 }
 
