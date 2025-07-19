@@ -53,33 +53,41 @@ pipeline {
             }
         }
 
-        stage('Terraform Apply - ECS Infrastructure') {
+stage('Terraform Apply - ECS Infrastructure') {
     steps {
-        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: "${AWS_CREDENTIALS_ID}"]]) {
+        withCredentials([[
+            $class: 'AmazonWebServicesCredentialsBinding',
+            credentialsId: "${AWS_CREDENTIALS_ID}"
+        ]]) {
             dir('terraform') {
-                sh """
-                    docker run --rm -v \$PWD:/workspace -w /workspace \
-                    -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
-                    -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
-                    -e AWS_DEFAULT_REGION=${AWS_REGION} \
-                    hashicorp/terraform:1.8.5 \
-                    terraform init
+                withEnv([
+                    'TF_IMAGE=hashicorp/terraform:1.8.5',
+                    'TF_VARS_IMAGE_URI=${IMAGE_URI}',
+                    'TF_SUBNETS=["subnet-0346e6a7e56b71359","subnet-0f98666a4bbb16c0f"]',
+                    'TF_SG_ID=sg-06763288ca7ac2b1f'
+                ]) {
+                    sh '''
+                        docker run --rm \
+                          -v "$PWD":/workspace -w /workspace \
+                          -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_DEFAULT_REGION \
+                          "$TF_IMAGE" init
 
-                    docker run --rm -v \$PWD:/workspace -w /workspace \
-                    -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
-                    -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
-                    -e AWS_DEFAULT_REGION=${AWS_REGION} \
-                    hashicorp/terraform:1.8.5 \
-                    terraform apply -auto-approve \
-                        -var='image_uri=${IMAGE_URI}' \
-                        -var='subnet_ids=["subnet-0346e6a7e56b71359","subnet-0f98666a4bbb16c0f"]' \
-                        -var='security_group_id=sg-06763288ca7ac2b1f'
-                """
+                        docker run --rm \
+                          -v "$PWD":/workspace -w /workspace \
+                          -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_DEFAULT_REGION \
+                          "$TF_IMAGE" apply -auto-approve \
+                          -var="image_uri=$TF_VARS_IMAGE_URI" \
+                          -var='subnet_ids=$TF_SUBNETS' \
+                          -var="security_group_id=$TF_SG_ID"
+                    '''
+                }
             }
         }
     }
 }
 
+
+        
         stage('Deploy to ECS Fargate') {
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: "${AWS_CREDENTIALS_ID}"]]) {
