@@ -33,7 +33,7 @@ pipeline {
         AWS_SECRET_ACCESS_KEY = credentials('aws-secret-access-key')
       }
       steps {
-        sh 'echo "$(aws ecr get-login-password --region ${AWS_REGION})" | docker login --username AWS --password-stdin ${ECR_REPO}'
+        sh 'echo "$(aws ecr get-login-password --region $AWS_REGION)" | docker login --username AWS --password-stdin $ECR_REPO'
         sh "docker push ${ECR_REPO}:${IMAGE_TAG}"
       }
     }
@@ -41,11 +41,7 @@ pipeline {
     stage('Terraform Init') {
       steps {
         dir('terraform') {
-          sh """
-            docker run --rm -v $(pwd):/workspace -w /workspace \
-              -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_REGION=${AWS_REGION} \
-              hashicorp/terraform:1.8.5 init
-          """
+          sh 'docker run --rm -v $(pwd):/workspace -w /workspace -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_REGION=$AWS_REGION hashicorp/terraform:1.8.5 init'
         }
       }
     }
@@ -53,16 +49,16 @@ pipeline {
     stage('Terraform Import (if needed)') {
       steps {
         dir('terraform') {
-          sh """
+          sh '''
             set +e
             docker run --rm -v $(pwd):/workspace -w /workspace \
-              -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_REGION=${AWS_REGION} \
+              -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_REGION=$AWS_REGION \
               hashicorp/terraform:1.8.5 import aws_ecs_cluster.this sha_CI_CD-Demo
             docker run --rm -v $(pwd):/workspace -w /workspace \
-              -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_REGION=${AWS_REGION} \
+              -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_REGION=$AWS_REGION \
               hashicorp/terraform:1.8.5 import aws_iam_role.ecs_task_execution_role ecsTaskExecutionRole
             set -e
-          """
+          '''
         }
       }
     }
@@ -70,22 +66,23 @@ pipeline {
     stage('Terraform Plan & Apply') {
       steps {
         dir('terraform') {
-          sh """
+          sh '''
             docker run --rm -v $(pwd):/workspace -w /workspace \
-              -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_REGION=${AWS_REGION} \
+              -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_REGION=$AWS_REGION \
               hashicorp/terraform:1.8.5 plan \
-              -var=image_uri=${ECR_REPO}:${IMAGE_TAG} \
+              -var="image_uri=''' + "${ECR_REPO}:${IMAGE_TAG}" + '''" \
               -var='subnet_ids=["subnet-0346e6a7e56b71359","subnet-0f98666a4bbb16c0f"]' \
-              -var=security_group_id=sg-06763288ca7ac2b1f
-          """
-          sh """
+              -var='security_group_id=sg-06763288ca7ac2b1f'
+          '''
+
+          sh '''
             docker run --rm -v $(pwd):/workspace -w /workspace \
-              -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_REGION=${AWS_REGION} \
+              -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_REGION=$AWS_REGION \
               hashicorp/terraform:1.8.5 apply -auto-approve \
-              -var=image_uri=${ECR_REPO}:${IMAGE_TAG} \
+              -var="image_uri=''' + "${ECR_REPO}:${IMAGE_TAG}" + '''" \
               -var='subnet_ids=["subnet-0346e6a7e56b71359","subnet-0f98666a4bbb16c0f"]' \
-              -var=security_group_id=sg-06763288ca7ac2b1f
-          """
+              -var='security_group_id=sg-06763288ca7ac2b1f'
+          '''
         }
       }
     }
