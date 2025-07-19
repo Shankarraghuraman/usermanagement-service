@@ -1,0 +1,86 @@
+pipeline {
+    agent any
+
+    environment {
+        AWS_REGION = 'us-east-1'
+        ECR_REGISTRY = '434748569008.dkr.ecr.us-east-1.amazonaws.com'
+        ECR_REPOSITORY = 'shankar/usermgmt'
+        IMAGE_TAG = ''
+        GIT_BRANCH = 'feature/shankar'
+        GIT_REPO = 'https://github.com/shankarraghuraman/usermanagement-service.git'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                git branch: "${env.GIT_BRANCH}", url: "${env.GIT_REPO}"
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('SonarQube') {
+                    withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
+                        sh """
+                            sonar-scanner \
+                            -Dsonar.projectKey=usermgmt-service \
+                            -Dsonar.sources=. \
+                            -Dsonar.host.url=\$SONAR_HOST_URL \
+                            -Dsonar.login=\$SONAR_TOKEN
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    env.IMAGE_TAG = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+                    sh "docker build -t ${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG} ."
+                }
+            }
+        }
+
+        stage('Push Docker Image to ECR') {
+            steps {
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws-creds'
+                ]]) {
+                    sh '''
+                        aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
+                        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+                    '''
+                }
+            }
+        }
+
+        stage('Terraform Plan & Apply') {
+            steps {
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws-creds'
+                ]]) {
+                    dir('terraform') {
+                        sh '''
+                            terraform init
+                            terraform plan -out=tfplan -var="image_tag=$IMAGE_TAG"
+                            terraform apply -auto-approve tfplan
+                        '''
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        failure {
+            echo '❌ CI/CD pipeline failed.'
+        }
+        success {
+            echo '✅ CI/CD pipeline completed successfully.'
+        }
+    }
+}
+
