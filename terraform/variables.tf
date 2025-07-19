@@ -1,11 +1,11 @@
 variable "aws_region" {
   type        = string
-  description = "AWS region"
+  description = "AWS region to deploy resources"
 }
 
 variable "vpc_id" {
   type        = string
-  description = "VPC ID"
+  description = "ID of the existing VPC"
 }
 
 variable "public_subnets" {
@@ -25,10 +25,10 @@ variable "ecr_repository" {
 
 variable "image_tag" {
   type        = string
-  description = "Image tag to deploy"
+  description = "Docker image tag to deploy"
 }
 
 variable "ecs_task_execution_role_name" {
   type        = string
-  description = "Name of the ECS task execution IAM role"
+  description = "Name of the existing ECS task execution role"
 }
