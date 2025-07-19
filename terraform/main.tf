@@ -1,10 +1,6 @@
-# main.tf
-
 provider "aws" {
   region = var.aws_region
 }
-
-
 
 data "aws_vpc" "selected" {
   id = var.vpc_id
@@ -23,7 +19,6 @@ data "aws_subnet" "public" {
 resource "aws_ecs_cluster" "this" {
   name = "usermgmt-cluster"
 }
-
 
 data "aws_iam_role" "ecs_task_execution" {
   name = var.ecs_task_execution_role_name
@@ -79,9 +74,9 @@ resource "aws_security_group" "ecs_tasks" {
   }
 
   ingress {
-    from_port   = 8080,
-    to_port     = 8080,
-    protocol    = "tcp",
+    from_port   = 8080
+    to_port     = 8080
+    protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 }
