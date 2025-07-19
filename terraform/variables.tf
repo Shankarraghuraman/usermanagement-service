@@ -1,6 +1,6 @@
 variable "image_tag" {
+  description = "Docker image tag (Git commit SHA)"
   type        = string
-  description = "Tag of the Docker image to deploy from ECR"
 }
 
 variable "subnet_ids" {
