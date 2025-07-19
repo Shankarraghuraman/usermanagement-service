@@ -26,9 +26,8 @@ pipeline {
             steps {
                 script {
                     def COMMIT_SHA = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                    def IMAGE_TAG = COMMIT_SHA
-                    env.IMAGE_TAG = IMAGE_TAG // Pass to later stages
-                    sh "docker build -t ${env.ECR_REGISTRY}/${env.ECR_REPOSITORY}:${IMAGE_TAG} ."
+                    def IMAGE_TAG = "${COMMIT_SHA}"
+                    sh "docker build -t ${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG} ."
                 }
             }
         }
@@ -36,11 +35,11 @@ pipeline {
         stage('Push to ECR') {
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
-                    sh '''
+                    sh """
                         aws --version
-                        aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
-                        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-                    '''
+                        aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}
+                        docker push ${ECR_REGISTRY}/${ECR_REPOSITORY}:\$(git rev-parse --short HEAD)
+                    """
                 }
             }
         }
