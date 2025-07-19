@@ -17,8 +17,7 @@ resource "aws_ecs_task_definition" "usermgmt_task" {
   requires_compatibilities = ["FARGATE"]
   cpu                      = "256"
   memory                   = "512"
-
-  execution_role_arn = data.aws_iam_role.ecs_task_execution_role.arn
+  execution_role_arn       = data.aws_iam_role.ecs_task_execution_role.arn
 
   container_definitions = jsonencode([
     {
@@ -47,4 +46,6 @@ resource "aws_ecs_service" "usermgmt_service" {
     security_groups = var.security_group_ids
     assign_public_ip = true
   }
+
+  depends_on = [aws_ecs_task_definition.usermgmt_task]
 }
