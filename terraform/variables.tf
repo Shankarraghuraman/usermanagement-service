@@ -1,14 +1,34 @@
-variable "image_tag" {
-  description = "Docker image tag (Git commit SHA)"
+variable "aws_region" {
+  description = "AWS region"
   type        = string
 }
 
-variable "subnet_ids" {
-  type        = list(string)
-  description = "List of subnet IDs for ECS tasks"
+variable "vpc_id" {
+  description = "VPC ID where ECS will run"
+  type        = string
 }
 
-variable "security_group_ids" {
+variable "public_subnets" {
+  description = "Public subnets for ALB"
   type        = list(string)
-  description = "List of security group IDs for ECS tasks"
+}
+
+variable "private_subnets" {
+  description = "Private subnets for ECS Fargate"
+  type        = list(string)
+}
+
+variable "ecr_registry" {
+  description = "ECR registry URI"
+  type        = string
+}
+
+variable "ecr_repository" {
+  description = "ECR repo name"
+  type        = string
+}
+
+variable "image_tag" {
+  description = "Git commit SHA for image tag"
+  type        = string
 }
