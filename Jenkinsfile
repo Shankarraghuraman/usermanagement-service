@@ -21,11 +21,16 @@ pipeline {
 
         stage('Build Maven Package') {
             steps {
-                dir("${env.WORKSPACE}") {
-                    sh '''
-                        echo "📦 Building Maven package..."
-                        mvn clean package
-                    '''
+                script {
+                    echo "📦 Building Maven package..."
+                    sh 'mvn clean package'
+
+                    // Get actual JAR file name
+                    env.JAR_FILE = sh(
+                        script: "ls target/*.jar | grep -v 'original' | head -n 1 | xargs basename",
+                        returnStdout: true
+                    ).trim()
+                    echo "✔️ JAR file to package: ${env.JAR_FILE}"
                 }
             }
         }
@@ -33,9 +38,9 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
+                    echo "🐳 Building Docker image with tag ${COMMIT_SHA}..."
                     sh """
-                        echo "🐳 Building Docker image..."
-                        docker build -t ${ECR_REPOSITORY}:${COMMIT_SHA} .
+                        docker build --build-arg JAR_FILE=${JAR_FILE} -t ${ECR_REPOSITORY}:${COMMIT_SHA} .
                         docker tag ${ECR_REPOSITORY}:${COMMIT_SHA} ${ECR_REGISTRY}/${ECR_REPOSITORY}:${COMMIT_SHA}
                     """
                 }
@@ -44,10 +49,9 @@ pipeline {
 
         stage('Push to ECR') {
             steps {
-                withCredentials([[ 
-                    $class: 'AmazonWebServicesCredentialsBinding', 
-                    credentialsId: 'aws-creds' 
-                ]]) {
+                withCredentials([
+                    [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']
+                ]) {
                     sh """
                         echo "🔐 Logging in to ECR..."
                         aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}
@@ -60,10 +64,9 @@ pipeline {
 
         stage('Terraform Init') {
             steps {
-                withCredentials([[ 
-                    $class: 'AmazonWebServicesCredentialsBinding', 
-                    credentialsId: 'aws-creds' 
-                ]]) {
+                withCredentials([
+                    [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']
+                ]) {
                     dir('terraform') {
                         sh 'terraform init'
                     }
@@ -73,10 +76,9 @@ pipeline {
 
         stage('Terraform Apply') {
             steps {
-                withCredentials([[ 
-                    $class: 'AmazonWebServicesCredentialsBinding', 
-                    credentialsId: 'aws-creds' 
-                ]]) {
+                withCredentials([
+                    [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']
+                ]) {
                     dir('terraform') {
                         sh """
                             echo "🧩 Running terraform plan and apply..."
