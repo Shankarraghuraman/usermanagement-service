@@ -72,3 +72,31 @@ pipeline {
                     }
                 }
             }
+        }
+
+        stage('Terraform Apply') {
+            steps {
+                withCredentials([
+                    [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']
+                ]) {
+                    dir('terraform') {
+                        sh """
+                            echo "🧩 Running terraform plan and apply..."
+                            terraform plan -var="image_tag=${COMMIT_SHA}" -out=tfplan
+                            terraform apply -auto-approve tfplan
+                        """
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo '✅ CI/CD pipeline completed successfully!'
+        }
+        failure {
+            echo '❌ CI/CD pipeline failed.'
+        }
+    }
+}
