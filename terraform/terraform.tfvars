@@ -1,6 +1,8 @@
 aws_region     = "us-east-1"
 vpc_id         = "vpc-0e751b6e61caae7c4"
 public_subnets = ["subnet-0acbe5c0a85ae3036", "subnet-0b7416afa26f4a297"]
+private_subnets = ["subnet-0d4d3847f381abf59", "subnet-0c8987bb821da513d"]
+
 
 ecr_registry   = "529088274428.dkr.ecr.us-east-1.amazonaws.com"
 ecr_repository = "shaecr"
