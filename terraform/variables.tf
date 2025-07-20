@@ -13,6 +13,11 @@ variable "public_subnets" {
   description = "List of public subnet IDs"
 }
 
+variable "private_subnets" {
+  type        = list(string)
+  description = "List of private subnet IDs"
+}
+
 variable "ecr_registry" {
   type        = string
   description = "ECR registry URL"
