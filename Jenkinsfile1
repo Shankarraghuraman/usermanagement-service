@@ -1,102 +1,64 @@
-pipeline {
-    agent any
+node {
+    def awsRegion = 'us-east-1'
+    def ecrRegistry = '529088274428.dkr.ecr.us-east-1.amazonaws.com'
+    def ecrRepository = 'shaecr'
+    def gitBranch = 'feature/shankar'
+    def gitRepo = 'https://github.com/shankarraghuraman/usermanagement-service.git'
 
-    environment {
-        AWS_REGION     = 'us-east-1'
-        ECR_REGISTRY   = '529088274428.dkr.ecr.us-east-1.amazonaws.com'
-        ECR_REPOSITORY = 'shaecr'
-        GIT_BRANCH     = 'feature/shankar'
-        GIT_REPO       = 'https://github.com/shankarraghuraman/usermanagement-service.git'
+    def imageTag = ''
+
+    stage('Checkout') {
+        git branch: gitBranch, url: gitRepo, credentialsId: 'git-creds'
+        imageTag = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+        echo "✔️ Checked out code at commit: ${imageTag}"
     }
 
-    stages {
-        stage('Checkout') {
-            steps {
-                git branch: "${env.GIT_BRANCH}", url: "${env.GIT_REPO}", credentialsId: 'git-creds'
-                script {
-                    env.COMMIT_SHA = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                }
-            }
-        }
+    stage('Build Maven Package') {
+        echo '📦 Building package...'
+        sh 'mvn clean package'
 
-        stage('Build Maven Package') {
-            steps {
-                script {
-                    echo "📦 Building Maven package..."
-                    sh 'mvn clean package'
+        env.JAR_FILE = sh(
+            script: "ls target/*.jar | grep -v 'original' | head -n 1 | xargs basename",
+            returnStdout: true
+        ).trim()
+        echo "✔️ JAR file: ${env.JAR_FILE}"
+    }
 
-                    // Get actual JAR file name
-                    env.JAR_FILE = sh(
-                        script: "ls target/*.jar | grep -v 'original' | head -n 1 | xargs basename",
-                        returnStdout: true
-                    ).trim()
-                    echo "✔️ JAR file to package: ${env.JAR_FILE}"
-                }
-            }
-        }
+    stage('Build Docker Image') {
+        echo "🐳 Building Docker image..."
+        sh """
+            docker build --build-arg JAR_FILE=${env.JAR_FILE} -t ${ecrRepository}:${imageTag} .
+            docker tag ${ecrRepository}:${imageTag} ${ecrRegistry}/${ecrRepository}:${imageTag}
+        """
+    }
 
-        stage('Build Docker Image') {
-            steps {
-                script {
-                    echo "🐳 Building Docker image with tag ${COMMIT_SHA}..."
-                    sh """
-                        docker build --build-arg JAR_FILE=${JAR_FILE} -t ${ECR_REPOSITORY}:${COMMIT_SHA} .
-                        docker tag ${ECR_REPOSITORY}:${COMMIT_SHA} ${ECR_REGISTRY}/${ECR_REPOSITORY}:${COMMIT_SHA}
-                    """
-                }
-            }
-        }
+    stage('Login to ECR') {
+        echo '🔐 Logging into AWS ECR using session profile...'
+        sh """
+            aws ecr get-login-password --region ${awsRegion} --profile jenkins-session | \
+            docker login --username AWS --password-stdin ${ecrRegistry}
+        """
+    }
 
-        stage('Push to ECR') {
-            steps {
-                withCredentials([
-                    [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']
-                ]) {
-                    sh """
-                        echo "🔐 Logging in to ECR..."
-                        aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}
-                        echo "📤 Pushing Docker image to ECR..."
-                        docker push ${ECR_REGISTRY}/${ECR_REPOSITORY}:${COMMIT_SHA}
-                    """
-                }
-            }
-        }
+    stage('Push Docker Image to ECR') {
+        echo '📤 Pushing Docker image to ECR...'
+        sh "docker push ${ecrRegistry}/${ecrRepository}:${imageTag}"
+    }
 
-        stage('Terraform Init') {
-            steps {
-                withCredentials([
-                    [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']
-                ]) {
-                    dir('terraform') {
-                        sh 'terraform init'
-                    }
-                }
-            }
-        }
+    stage('Terraform Deploy') {
+        dir('terraform') {
+            echo '📦 Terraform Init...'
+            sh 'terraform init'
 
-        stage('Terraform Apply') {
-            steps {
-                withCredentials([
-                    [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']
-                ]) {
-                    dir('terraform') {
-                        sh """
-                            echo "🧩 Running terraform plan and apply..."
-                            terraform plan -var="image_tag=${COMMIT_SHA}" -out=tfplan
-                            terraform apply -auto-approve tfplan
-                        """
-                    }
-                }
-            }
+            echo '🚀 Terraform Plan and Apply...'
+            sh """
+                terraform plan -var="image_tag=${imageTag}" -out=tfplan
+                terraform apply -auto-approve tfplan
+            """
         }
     }
 
-    post {
-        success {
-            echo '✅ CI/CD pipeline completed successfully!'
-        }
-        failure {
-            echo '❌ CI/CD pipeline failed.'
-        }
+    stage('Done') {
+        echo '✅ Deployment completed!'
     }
 }
