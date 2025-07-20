@@ -34,10 +34,12 @@ node {
 
     stage('Login to ECR') {
         echo '🔐 Logging into AWS ECR using session profile...'
-        sh """
-            aws ecr get-login-password --region ${awsRegion} --profile jenkins-session | \
-            docker login --username AWS --password-stdin ${ecrRegistry}
-        """
+        withEnv(["AWS_PROFILE=jenkins-session"]) {
+            sh """
+                aws ecr get-login-password --region ${awsRegion} | \
+                docker login --username AWS --password-stdin ${ecrRegistry}
+            """
+        }
     }
 
     stage('Push Docker Image to ECR') {
@@ -46,19 +48,19 @@ node {
     }
 
     stage('Terraform Deploy') {
-    dir('terraform') {
-        echo '📦 Terraform Init...'
-        withEnv(['AWS_PROFILE=jenkins-session']) {
-            sh 'terraform init'
+        dir('terraform') {
+            echo '📦 Terraform Init...'
+            withEnv(['AWS_PROFILE=jenkins-session']) {
+                sh 'terraform init'
 
-            echo '🚀 Terraform Plan and Apply...'
-            sh """
-                terraform plan -var="image_tag=${imageTag}" -out=tfplan
-                terraform apply -auto-approve tfplan
-            """
+                echo '🚀 Terraform Plan and Apply...'
+                sh """
+                    terraform plan -var="image_tag=${imageTag}" -out=tfplan
+                    terraform apply -auto-approve tfplan
+                """
+            }
         }
     }
-}
 
     stage('Done') {
         echo '✅ Deployment completed!'
