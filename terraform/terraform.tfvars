@@ -8,4 +8,4 @@ ecr_repository = "shankar/usermgmt"
 # Will be dynamically passed by Jenkins
 image_tag = "override-me-from-jenkins"
 
-ecs_task_execution_role_name = "ecsTaskExecutionRole"
+ecs_task_execution_role_name = "ecsTaskExecutionRole-new"
