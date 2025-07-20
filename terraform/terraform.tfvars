@@ -1,6 +1,6 @@
 aws_region     = "us-east-1"
-vpc_id         = "vpc-06bc7d52970be2acb"
-public_subnets = ["subnet-0346e6a7e56b71359", "subnet-01a04566dfc5befa7"]
+vpc_id         = "vpc-0e751b6e61caae7c4"
+public_subnets = ["subnet-0acbe5c0a85ae3036", "subnet-0b7416afa26f4a297"]
 
 ecr_registry   = "434748569008.dkr.ecr.us-east-1.amazonaws.com"
 ecr_repository = "shankar/usermgmt"
