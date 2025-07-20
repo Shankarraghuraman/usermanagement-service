@@ -46,8 +46,9 @@ node {
     }
 
     stage('Terraform Deploy') {
-        dir('terraform') {
-            echo '📦 Terraform Init...'
+    dir('terraform') {
+        echo '📦 Terraform Init...'
+        withEnv(['AWS_PROFILE=jenkins-session']) {
             sh 'terraform init'
 
             echo '🚀 Terraform Plan and Apply...'
@@ -57,6 +58,7 @@ node {
             """
         }
     }
+}
 
     stage('Done') {
         echo '✅ Deployment completed!'
