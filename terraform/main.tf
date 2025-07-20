@@ -42,8 +42,8 @@ resource "aws_ecs_service" "usermgmt" {
   launch_type     = "FARGATE"
 
   network_configuration {
-    subnets          = var.public_subnets
-    assign_public_ip = true
+    subnets          = var.private_subnets
+    assign_public_ip = false
     security_groups  = [aws_security_group.ecs_tasks.id]
   }
 }
