@@ -14,8 +14,8 @@ resource "aws_ecs_task_definition" "usermgmt" {
   family                   = "usermgmt-task"
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
-  cpu                      = "256"
-  memory                   = "512"
+  cpu                      = "512"
+  memory                   = "1024"
   execution_role_arn       = data.aws_iam_role.ecs_execution_role.arn
 
   container_definitions = jsonencode([
@@ -25,10 +25,37 @@ resource "aws_ecs_task_definition" "usermgmt" {
       essential = true
       portMappings = [
         {
-          containerPort = 8080
-          hostPort      = 8080
+          containerPort = 8095
+          hostPort      = 8095
           protocol      = "tcp"
         }
+      ],
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = "/ecs/usermgmt"
+          awslogs-region        = "${var.aws_region}"
+          awslogs-stream-prefix = "ecs"
+        }
+      },
+      environment = [
+        // Add real env vars here if your app needs them
+        {
+          name  = "JAVA_OPTS"
+          value = ""
+        }
+        // {
+        //   name  = "SPRING_DATASOURCE_URL"
+        //   value = "jdbc:mysql://db.example.com:3306/mydb"
+        // },
+        // {
+        //   name  = "SPRING_DATASOURCE_USERNAME"
+        //   value = "admin"
+        // },
+        // {
+        //   name  = "SPRING_DATASOURCE_PASSWORD"
+        //   value = "your_password"
+        // }
       ]
     }
   ])
@@ -54,8 +81,8 @@ resource "aws_security_group" "ecs_tasks" {
   vpc_id      = var.vpc_id
 
   ingress {
-    from_port   = 8080
-    to_port     = 8080
+    from_port   = 8095
+    to_port     = 8095
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
