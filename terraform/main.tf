@@ -29,33 +29,6 @@ resource "aws_ecs_task_definition" "usermgmt" {
           hostPort      = 8095
           protocol      = "tcp"
         }
-      ],
-      logConfiguration = {
-        logDriver = "awslogs"
-        options = {
-          awslogs-group         = "/ecs/usermgmt"
-          awslogs-region        = "${var.aws_region}"
-          awslogs-stream-prefix = "ecs"
-        }
-      },
-      environment = [
-        // Add real env vars here if your app needs them
-        {
-          name  = "JAVA_OPTS"
-          value = ""
-        }
-        // {
-        //   name  = "SPRING_DATASOURCE_URL"
-        //   value = "jdbc:mysql://db.example.com:3306/mydb"
-        // },
-        // {
-        //   name  = "SPRING_DATASOURCE_USERNAME"
-        //   value = "admin"
-        // },
-        // {
-        //   name  = "SPRING_DATASOURCE_PASSWORD"
-        //   value = "your_password"
-        // }
       ]
     }
   ])
