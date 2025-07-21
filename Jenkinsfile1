@@ -33,7 +33,7 @@ node {
     }
 
     stage('Login to ECR') {
-        echo '🔐 Logging into AWS ECR using session profile...'
+        echo '🔐 Logging into AWS ECR using session profile from ~/.aws/credentials...'
         withEnv(["AWS_PROFILE=jenkins-session"]) {
             sh """
                 aws ecr get-login-password --region ${awsRegion} | \
