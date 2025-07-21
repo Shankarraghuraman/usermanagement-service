@@ -66,6 +66,15 @@ resource "aws_ecs_service" "usermgmt" {
     assign_public_ip = false
     security_groups  = [aws_security_group.ecs_tasks.id]
   }
+
+  # ✅ Attach service to ALB target group
+  load_balancer {
+    target_group_arn = "arn:aws:elasticloadbalancing:us-east-1:529088274428:targetgroup/ALBtoECS/759d7fe93729b543"
+    container_name   = "usermgmt"
+    container_port   = 8095
+  }
+
+  depends_on = [aws_ecs_task_definition.usermgmt]
 }
 
 resource "aws_security_group" "ecs_tasks" {
@@ -73,11 +82,12 @@ resource "aws_security_group" "ecs_tasks" {
   description = "Allow HTTP traffic to ECS tasks"
   vpc_id      = var.vpc_id
 
+  # ✅ Allow only ALB to access port 8095
   ingress {
-    from_port   = 8095
-    to_port     = 8095
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    from_port       = 8095
+    to_port         = 8095
+    protocol        = "tcp"
+    security_groups = ["sg-0bf7dcd5771b4f403"] # ALB SG
   }
 
   egress {
