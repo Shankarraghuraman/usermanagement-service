@@ -15,6 +15,26 @@ resource "aws_ecs_cluster" "main" {
   name = "usermgmt-cluster"
 }
 
+resource "aws_security_group" "ecs_tasks" {
+  name        = "ecs-tasks-sg"
+  description = "Allow ALB to reach ECS tasks"
+  vpc_id      = var.vpc_id
+
+  ingress {
+    from_port       = 8095
+    to_port         = 8095
+    protocol        = "tcp"
+    security_groups = ["sg-0bf7dcd5771b4f403"] # ALB Security Group
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
 resource "aws_ecs_task_definition" "usermgmt" {
   family                   = "usermgmt-task"
   requires_compatibilities = ["FARGATE"]
@@ -66,24 +86,12 @@ resource "aws_ecs_service" "usermgmt" {
     assign_public_ip = false
     security_groups  = [aws_security_group.ecs_tasks.id]
   }
-}
 
-resource "aws_security_group" "ecs_tasks" {
-  name        = "ecs-tasks-sg"
-  description = "Allow HTTP traffic to ECS tasks"
-  vpc_id      = var.vpc_id
-
-  ingress {
-    from_port   = 8095
-    to_port     = 8095
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+  load_balancer {
+    target_group_arn = "arn:aws:elasticloadbalancing:us-east-1:529088274428:targetgroup/ALBtoECS/dd0d5e43000b7974"
+    container_name   = "usermgmt"
+    container_port   = 8095
   }
 
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+  depends_on = [aws_ecs_task_definition.usermgmt]
 }
