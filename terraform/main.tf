@@ -22,7 +22,7 @@ resource "aws_ecs_task_definition" "usermgmt" {
   cpu                      = "512"
   memory                   = "1024"
   execution_role_arn       = data.aws_iam_role.ecs_execution_role.arn
-  task_role_arn            = data.aws_iam_role.ecs_execution_role.arn  # Still required field, reusing same role
+  task_role_arn            = data.aws_iam_role.ecs_execution_role.arn
 
   container_definitions = jsonencode([{
     name      = "usermgmt"
@@ -34,6 +34,14 @@ resource "aws_ecs_task_definition" "usermgmt" {
       hostPort      = 8095
       protocol      = "tcp"
     }]
+
+    environment = [
+      { name = "AWS_RDS_HOSTNAME",  value = "sha-db.c6h44cmyuuaw.us-east-1.rds.amazonaws.com" },
+      { name = "AWS_RDS_PORT",      value = "3306" },
+      { name = "AWS_RDS_DB_NAME",   value = "usermanagement" },
+      { name = "AWS_RDS_USERNAME",  value = "admin" },
+      { name = "AWS_RDS_PASSWORD",  value = "XbqB4qo77SpmNVbFK6VF" }
+    ]
 
     logConfiguration = {
       logDriver = "awslogs"
