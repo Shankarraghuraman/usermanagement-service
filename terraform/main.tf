@@ -6,6 +6,11 @@ data "aws_iam_role" "ecs_execution_role" {
   name = var.ecs_task_execution_role_name
 }
 
+resource "aws_cloudwatch_log_group" "ecs_logs" {
+  name              = "/ecs/usermgmt"
+  retention_in_days = 7
+}
+
 resource "aws_ecs_cluster" "main" {
   name = "usermgmt-cluster"
 }
@@ -17,23 +22,28 @@ resource "aws_ecs_task_definition" "usermgmt" {
   cpu                      = "512"
   memory                   = "1024"
   execution_role_arn       = data.aws_iam_role.ecs_execution_role.arn
-  task_role_arn            = data.aws_iam_role.ecs_execution_role.arn
+  task_role_arn            = data.aws_iam_role.ecs_execution_role.arn  # Still required field, reusing same role
 
+  container_definitions = jsonencode([{
+    name      = "usermgmt"
+    image     = "${var.ecr_registry}/${var.ecr_repository}:${var.image_tag}"
+    essential = true
 
-  container_definitions = jsonencode([
-    {
-      name      = "usermgmt"
-      image     = "${var.ecr_registry}/${var.ecr_repository}:${var.image_tag}"
-      essential = true
-      portMappings = [
-        {
-          containerPort = 8095
-          hostPort      = 8095
-          protocol      = "tcp"
-        }
-      ]
+    portMappings = [{
+      containerPort = 8095
+      hostPort      = 8095
+      protocol      = "tcp"
+    }]
+
+    logConfiguration = {
+      logDriver = "awslogs"
+      options = {
+        awslogs-group         = aws_cloudwatch_log_group.ecs_logs.name
+        awslogs-region        = var.aws_region
+        awslogs-stream-prefix = "usermgmt"
+      }
     }
-  ])
+  }])
 }
 
 resource "aws_ecs_service" "usermgmt" {
