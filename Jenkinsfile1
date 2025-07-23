@@ -43,19 +43,22 @@ node {
                     '''
                 }
             } catch (Exception e) {
-                echo "⚠️ SonarQube server not configured. Running analysis with default settings..."
-                sh '''
-                    mvn sonar:sonar \
-                        -Dsonar.host.url=${SONAR_HOST_URL:-http://localhost:9000} \
-                        -Dsonar.projectKey=usermanagement-service \
-                        -Dsonar.projectName="User Management Service" \
-                        -Dsonar.projectVersion=${BUILD_NUMBER} \
-                        -Dsonar.sources=src/main/java \
-                        -Dsonar.tests=src/test/java \
-                        -Dsonar.java.binaries=target/classes \
-                        -Dsonar.junit.reportPaths=target/surefire-reports \
-                        -Dsonar.jacoco.reportPaths=target/site/jacoco/jacoco.xml
-                '''
+                echo "⚠️ SonarQube server not configured in Jenkins. Running with direct connection..."
+                withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
+                    sh '''
+                        mvn sonar:sonar \
+                            -Dsonar.host.url=http://localhost:9000 \
+                            -Dsonar.login=${SONAR_TOKEN} \
+                            -Dsonar.projectKey=usermanagement-service \
+                            -Dsonar.projectName="User Management Service" \
+                            -Dsonar.projectVersion=${BUILD_NUMBER} \
+                            -Dsonar.sources=src/main/java \
+                            -Dsonar.tests=src/test/java \
+                            -Dsonar.java.binaries=target/classes \
+                            -Dsonar.junit.reportPaths=target/surefire-reports \
+                            -Dsonar.jacoco.reportPaths=target/site/jacoco/jacoco.xml
+                    '''
+                }
             }
         }
     }
@@ -72,8 +75,11 @@ node {
                     echo "✔️ Quality Gate passed!"
                 }
             } catch (Exception e) {
-                echo "⚠️ Quality Gate check skipped - SonarQube server not fully configured"
-                echo "✔️ SonarQube analysis completed, continuing with deployment..."
+                echo "⚠️ Quality Gate check skipped - SonarQube analysis was not performed"
+                echo "ℹ️ Quality Gate requires:"
+                echo "   1. SonarQube server to be configured and accessible"
+                echo "   2. SonarQube analysis to complete successfully"
+                echo "✔️ Continuing with deployment without quality gate validation..."
             }
         }
     }
