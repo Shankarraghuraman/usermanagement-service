@@ -17,7 +17,11 @@
 
     <properties>
         <java.version>1.8</java.version>
-        <maven.test.skip>true</maven.test.skip>
+        <maven.test.skip>false</maven.test.skip>
+        <!-- SonarQube Properties -->
+        <sonar.java.coveragePlugin>jacoco</sonar.java.coveragePlugin>
+        <sonar.dynamicAnalysis>reuseReports</sonar.dynamicAnalysis>
+        <sonar.language>java</sonar.language>
     </properties>
     <packaging>${packaging.type}</packaging>
     <profiles>
@@ -85,6 +89,32 @@
 							<tag>${project.version}</tag>
 							<skipDockerInfo>true</skipDockerInfo>
 						</configuration>
+					</plugin>
+					<!-- SonarQube Plugin -->
+					<plugin>
+						<groupId>org.sonarsource.scanner.maven</groupId>
+						<artifactId>sonar-maven-plugin</artifactId>
+						<version>3.9.1.2184</version>
+					</plugin>
+					<!-- JaCoCo Plugin for Code Coverage -->
+					<plugin>
+						<groupId>org.jacoco</groupId>
+						<artifactId>jacoco-maven-plugin</artifactId>
+						<version>0.8.7</version>
+						<executions>
+							<execution>
+								<goals>
+									<goal>prepare-agent</goal>
+								</goals>
+							</execution>
+							<execution>
+								<id>report</id>
+								<phase>test</phase>
+								<goals>
+									<goal>report</goal>
+								</goals>
+							</execution>
+						</executions>
 					</plugin>	                    
                 </plugins>
             </build>
