@@ -27,7 +27,6 @@ node {
     stage('SonarQube Analysis') {
         echo '🔍 Running SonarQube analysis...'
         script {
-            // Check if SonarQube server is configured
             try {
                 withSonarQubeEnv('SonarQube') {
                     sh '''
@@ -42,44 +41,47 @@ node {
                             -Dsonar.jacoco.reportPaths=target/site/jacoco/jacoco.xml
                     '''
                 }
+                echo "✅ SonarQube analysis submitted successfully"
             } catch (Exception e) {
-                echo "⚠️ SonarQube server not configured in Jenkins. Running with direct connection..."
-                withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
-                    sh '''
-                        mvn sonar:sonar \
-                            -Dsonar.host.url=http://localhost:9000 \
-                            -Dsonar.login=${SONAR_TOKEN} \
-                            -Dsonar.projectKey=usermanagement-service \
-                            -Dsonar.projectName="User Management Service" \
-                            -Dsonar.projectVersion=${BUILD_NUMBER} \
-                            -Dsonar.sources=src/main/java \
-                            -Dsonar.tests=src/test/java \
-                            -Dsonar.java.binaries=target/classes \
-                            -Dsonar.junit.reportPaths=target/surefire-reports \
-                            -Dsonar.jacoco.reportPaths=target/site/jacoco/jacoco.xml
-                    '''
-                }
+                echo "❌ SonarQube analysis failed: ${e.getMessage()}"
+                error "SonarQube analysis is mandatory for this pipeline"
             }
         }
     }
 
     stage('Quality Gate') {
-        echo '🚪 Checking for Quality Gate...'
+        echo '🚪 Waiting for SonarQube Quality Gate...'
         script {
             try {
                 timeout(time: 10, unit: 'MINUTES') {
                     def qg = waitForQualityGate()
+                    echo "📊 Quality Gate Status: ${qg.status}"
+                    
                     if (qg.status != 'OK') {
-                        error "Pipeline aborted due to quality gate failure: ${qg.status}"
+                        echo "❌ Quality Gate Failed!"
+                        echo "📋 Quality Gate Details:"
+                        echo "   Status: ${qg.status}"
+                        if (qg.qualityGate) {
+                            echo "   Quality Gate: ${qg.qualityGate.name}"
+                        }
+                        
+                        // Fail the pipeline for quality gate failure
+                        error "🚫 Pipeline aborted due to quality gate failure: ${qg.status}"
                     }
-                    echo "✔️ Quality Gate passed!"
+                    
+                    echo "✅ Quality Gate passed successfully!"
+                    echo "🎉 Code quality meets the required standards"
                 }
             } catch (Exception e) {
-                echo "⚠️ Quality Gate check skipped - SonarQube analysis was not performed"
-                echo "ℹ️ Quality Gate requires:"
-                echo "   1. SonarQube server to be configured and accessible"
-                echo "   2. SonarQube analysis to complete successfully"
-                echo "✔️ Continuing with deployment without quality gate validation..."
+                echo "❌ Quality Gate check failed: ${e.getMessage()}"
+                echo "🔍 This could be due to:"
+                echo "   - SonarQube server not configured in Jenkins"
+                echo "   - Missing webhook configuration in SonarQube"
+                echo "   - Network connectivity issues"
+                echo "   - SonarQube analysis not completed"
+                
+                // Fail the pipeline if quality gate check fails
+                error "🚫 Quality Gate validation is mandatory for deployment"
             }
         }
     }
